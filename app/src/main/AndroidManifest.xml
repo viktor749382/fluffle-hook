@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.flufflehook">
+    <application android:label="Fluffle Privacy">
+        <meta-data android:name="xposedmodule" android:value="true"/>
+        <meta-data android:name="xposedminversion" android:value="53"/>
+        <meta-data android:name="xposeddescription" android:value="Fluffle audio injector"/>
+    </application>
+</manifest>
