@@ -6,6 +6,7 @@ import android.media.AudioManager;
 import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
 import java.util.concurrent.ScheduledExecutorService;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -25,68 +26,42 @@ public class FlufflePrivacyModule implements IXposedHookLoadPackage {
 
         XposedBridge.log("FluffleHook: Loaded into " + lpparam.packageName);
 
-        Class<?> errorCallbackClass = Class.forName(
-            "org.webrtc.audio.JavaAudioDeviceModule$AudioRecordErrorCallback",
-            true, lpparam.classLoader);
-        Class<?> stateCallbackClass = Class.forName(
-            "org.webrtc.audio.JavaAudioDeviceModule$AudioRecordStateCallback",
-            true, lpparam.classLoader);
-        Class<?> samplesCallbackClass = Class.forName(
-            "org.webrtc.audio.JavaAudioDeviceModule$SamplesReadyCallback",
-            true, lpparam.classLoader);
-
-        XposedHelpers.findAndHookConstructor(
-            "org.webrtc.audio.WebRtcAudioRecord",
+        // Hook AudioRecord.read() — yahi native mic data padhta hai byteBuffer mein
+        XposedHelpers.findAndHookMethod(
+            "android.media.AudioRecord",
             lpparam.classLoader,
-            Context.class,
-            ScheduledExecutorService.class,
-            AudioManager.class,
-            int.class, int.class,
-            errorCallbackClass,
-            stateCallbackClass,
-            samplesCallbackClass,
-            boolean.class, boolean.class,
+            "read",
+            ByteBuffer.class,
+            int.class,
+            int.class,
             new XC_MethodHook() {
                 @Override
-                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    ByteBuffer buffer = (ByteBuffer) param.args[0];
+                    int sizeInBytes = (int) param.args[1];
+
                     try {
-                        pcmStream = new FileInputStream(PCM_FILE);
-                        XposedBridge.log("FluffleHook: PCM file opened OK");
-                    } catch (Exception e) {
-                        XposedBridge.log("FluffleHook: PCM file error - " + e.getMessage());
-                        return;
-                    }
-
-                    Object fakeCallback = Proxy.newProxyInstance(
-                        lpparam.classLoader,
-                        new Class[]{samplesCallbackClass},
-                        (proxy, method, args) -> {
-                            if (!method.getName().equals("onWebRtcAudioRecordSamplesReady"))
-                                return null;
-
-                            try {
-                                Object audioSamples = args[0];
-                                Field dataField = audioSamples.getClass().getDeclaredField("data");
-                                dataField.setAccessible(true);
-                                byte[] original = (byte[]) dataField.get(audioSamples);
-                                byte[] fake = new byte[original.length];
-
-                                int read = pcmStream.read(fake);
-                                if (read < fake.length) {
-                                    try { pcmStream.close(); } catch (Exception ignored) {}
-                                    pcmStream = new FileInputStream(PCM_FILE);
-                                    pcmStream.read(fake, read, fake.length - read);
-                                }
-
-                                dataField.set(audioSamples, fake);
-                            } catch (Exception e) {
-                                XposedBridge.log("FluffleHook: inject error - " + e.getMessage());
-                            }
-                            return null;
+                        if (pcmStream == null) {
+                            pcmStream = new FileInputStream(PCM_FILE);
+                            XposedBridge.log("FluffleHook: PCM stream opened");
                         }
-                    );
 
-                    param.args[7] = fakeCallback;
+                        byte[] fake = new byte[sizeInBytes];
+                        int read = pcmStream.read(fake);
+                        if (read < sizeInBytes) {
+                            try { pcmStream.close(); } catch (Exception ignored) {}
+                            pcmStream = new FileInputStream(PCM_FILE);
+                            pcmStream.read(fake, read, sizeInBytes - read);
+                        }
+
+                        int pos = buffer.position();
+                        buffer.rewind();
+                        buffer.put(fake, 0, sizeInBytes);
+                        buffer.position(pos);
+
+                    } catch (Exception e) {
+                        XposedBridge.log("FluffleHook: read hook error - " + e.getMessage());
+                    }
                 }
             }
         );
