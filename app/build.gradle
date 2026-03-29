@@ -5,12 +5,18 @@ buildscript {
     }
 }
 
-apply plugin: 'com.android.library'
+apply plugin: 'com.android.application'
 
 android {
     namespace 'com.flufflehook'
     compileSdk 34
-    defaultConfig { minSdk 26 }
+    defaultConfig {
+        applicationId 'com.flufflehook'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
 }
 
 repositories {
