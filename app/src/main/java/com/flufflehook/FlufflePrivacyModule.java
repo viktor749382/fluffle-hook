@@ -26,7 +26,6 @@ public class FlufflePrivacyModule implements IXposedHookLoadPackage {
 
         XposedBridge.log("FluffleHook: Loaded into " + lpparam.packageName);
 
-        // Hook AudioRecord.read() — yahi native mic data padhta hai byteBuffer mein
         XposedHelpers.findAndHookMethod(
             "android.media.AudioRecord",
             lpparam.classLoader,
@@ -54,10 +53,10 @@ public class FlufflePrivacyModule implements IXposedHookLoadPackage {
                             pcmStream.read(fake, read, sizeInBytes - read);
                         }
 
-                        int pos = buffer.position();
                         buffer.rewind();
                         buffer.put(fake, 0, sizeInBytes);
-                        buffer.position(pos);
+                        buffer.rewind();
+                        param.setResult(sizeInBytes);
 
                     } catch (Exception e) {
                         XposedBridge.log("FluffleHook: read hook error - " + e.getMessage());
