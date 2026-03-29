@@ -17,7 +17,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 public class FlufflePrivacyModule implements IXposedHookLoadPackage {
 
     private static FileInputStream pcmStream;
-    private static final String PCM_FILE = "/sdcard/fake_audio.pcm";
+    private static final String PCM_FILE = "/data/data/com.fluffleapp.mobile/fake_audio.pcm";
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
